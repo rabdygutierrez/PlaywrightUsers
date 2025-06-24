@@ -18,14 +18,22 @@ export default defineConfig({
   /* Retry on CI only */
   retries: process.env.CI ? 1 : 0,
   /* Opt out of parallel tests on CI. */
-  workers: process.env.CI ? 1 : 100,
+  // Ajusta a 50 workers por defecto en local, 1 en CI
+  workers: process.env.CI ? 1 : 50,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: 'html', // Puedes usar 'list' o 'dot' si prefieres algo más simple
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
-    /* Base URL to use in actions like `await page.goto('/')`. */
-    // baseURL: 'http://127.0.0.1:3000',
-
+    /* Ejecutar en headless por defecto */
+    headless: true,
+    /* Desactivar sandbox para entornos Linux cloud */
+    launchOptions: {
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage'
+      ],
+    },
     /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
     trace: 'on-first-retry',
   },

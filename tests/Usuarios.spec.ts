@@ -87,7 +87,7 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
         let lastId = '';
         let idVisto = false;
 
-        for (let minute = 0; minute < 1; minute++) {
+        for (let minute = 0; minute < 15; minute++) {
           let idEncontradoEsteMinuto = false;
 
           for (let intento = 0; intento < 3; intento++) {
