@@ -26,7 +26,6 @@ const tokensFallidos: string[] = [];
 
 const GLOBAL_TIMEOUT = 10 * 60 * 1000;
 
-
 // === Test principal ===
 test.describe.parallel('🔁 Validación de tokens LIVE', () => {
   tokens.forEach((rawToken, index) => {
@@ -73,7 +72,14 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
       });
 
       await test.step('3-4. Mantener sesión activa y verificar ID del video dinámicamente', async () => {
-        // Si aparece el botón 'Seleccionar' dentro de .container-button, hacer clic
+        // Validar antes si la sesión está expirada y salir si es así
+        const sesionExpirada = page.locator('text=sesión expirada');
+        if (await sesionExpirada.isVisible({ timeout: 3000 }).catch(() => false)) {
+          console.warn(`[TEST ${start + index + 1}] 🚫 Sesión expirada detectada antes de validación de ID.`);
+          tokensFallidos.push(token);
+          return;
+        }
+
         const seleccionarBtn = page.locator('.container-button button.button', { hasText: 'Seleccionar' });
         if (await seleccionarBtn.isVisible({ timeout: 2000 }).catch(() => false)) {
           await seleccionarBtn.click();
@@ -86,14 +92,12 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
         let idDetectado = false;
 
         for (let minuto = 0; minuto < 5; minuto++) {
-          // Detectar si aparece mensaje de sesión expirada ANTES de validar el ID
-          const sesionExpirada = page.locator('text=sesión expirada');
           if (await sesionExpirada.isVisible({ timeout: 1000 }).catch(() => false)) {
             console.warn(`[TEST ${start + index + 1}] 🚫 Sesión expirada detectada (min ${minuto + 1})`);
             tokensFallidos.push(token);
-            break; // No validar el ID del video si la sesión está expirada
+            break;
           }
-          // Solo si NO está expirada, validar el ID del video
+
           try {
             const visible = await videoIdElement.isVisible({ timeout: 30000 });
             if (visible) {
@@ -118,21 +122,17 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
             break;
           }
 
-          // Si se detectó un ID válido, salir del bucle
           if (idDetectado) break;
 
-          // Esperar 1 minuto antes de la siguiente verificación
           await new Promise(resolve => setTimeout(resolve, 60 * 1000));
         }
 
-        // Reportar tokens con ID vacío al final de la prueba
         if (idVacioCount > 0) {
           console.warn(`[TEST ${start + index + 1}] ⚠️ Se detectaron ${idVacioCount} ID(s) vacío(s).`);
           tokensFallidos.push(token);
         }
       });
 
-      // Esperar 10 segundos antes de cerrar la prueba para ver resultados en la interfaz
       await new Promise(resolve => setTimeout(resolve, 10 * 1000));
     });
   });
