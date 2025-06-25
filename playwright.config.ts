@@ -23,7 +23,7 @@ export default defineConfig({
   reporter: 'html',
   /* Shared settings for all the projects below. */
   use: {
-    headless: true, // ejecutar sin interfaz gráfica
+    headless: process.env.HEADLESS !== 'false', // Controlar modo headless con variable de entorno
     ignoreHTTPSErrors: true,
     /* Desactivar sandbox y otras flags para entornos Linux headless */
     launchOptions: {
