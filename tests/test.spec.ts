@@ -98,4 +98,42 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
             const visible = await videoIdElement.isVisible({ timeout: 30000 });
             if (visible) {
               const idActual = (await videoIdElement.textContent())?.trim();
-              if
+              if (idActual) {
+                if (idActual !== lastId) {
+                  lastId = idActual;
+                  console.log(`[TEST ${start + index + 1}] 🎥 ID nuevo en min ${minuto + 1}: ${idActual}`);
+                  tokensExitosos.push(token);
+                  idDetectado = true;
+                }
+              } else {
+                console.log(`[TEST ${start + index + 1}] ⚠️ ID visible pero vacío (min ${minuto + 1})`);
+                idVacioCount++;
+              }
+            } else {
+              console.warn(`[TEST ${start + index + 1}] ⚠️ ID no visible (min ${minuto + 1})`);
+            }
+          } catch (e) {
+            console.error(`[TEST ${start + index + 1}] ❌ ERROR al verificar ID: ${e.message}`);
+            tokensFallidos.push(token);
+            break;
+          }
+
+          // Si se detectó un ID válido, salir del bucle
+          if (idDetectado) break;
+
+          // Esperar 1 minuto antes de la siguiente verificación
+          await new Promise(resolve => setTimeout(resolve, 60 * 1000));
+        }
+
+        // Reportar tokens con ID vacío al final de la prueba
+        if (idVacioCount > 0) {
+          console.warn(`[TEST ${start + index + 1}] ⚠️ Se detectaron ${idVacioCount} ID(s) vacío(s).`);
+          tokensFallidos.push(token);
+        }
+      });
+
+      // Esperar 10 segundos antes de cerrar la prueba para ver resultados en la interfaz
+      await new Promise(resolve => setTimeout(resolve, 10 * 1000));
+    });
+  });
+});
