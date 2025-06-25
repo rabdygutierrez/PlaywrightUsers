@@ -90,6 +90,7 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
         const videoIdElement = page.locator(videoIdSelector);
         let lastId = '';
         let idDetectado = false;
+        let idDetectadoMinuto = -1;
 
         for (let minuto = 0; minuto < 5; minuto++) {
           if (await sesionExpirada.isVisible({ timeout: 1000 }).catch(() => false)) {
@@ -103,11 +104,17 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
             if (visible) {
               const idActual = (await videoIdElement.textContent())?.trim();
               if (idActual) {
-                if (idActual !== lastId) {
-                  lastId = idActual;
-                  console.log(`[TEST ${start + index + 1}] 🎥 ID nuevo en min ${minuto + 1}: ${idActual}`);
-                  tokensExitosos.push(token);
+                if (!idDetectado) {
                   idDetectado = true;
+                  idDetectadoMinuto = minuto + 1;
+                  lastId = idActual;
+                  console.log(`[TEST ${start + index + 1}] 🎥 ID detectado en min ${idDetectadoMinuto}: ${idActual}`);
+                  tokensExitosos.push(token);
+                } else if (idActual !== lastId) {
+                  lastId = idActual;
+                  console.log(`[TEST ${start + index + 1}] 🔄 ID cambió en min ${minuto + 1}: ${idActual}`);
+                } else {
+                  console.log(`[TEST ${start + index + 1}] ⏳ ID sin cambios en min ${minuto + 1}: ${idActual}`);
                 }
               } else {
                 console.log(`[TEST ${start + index + 1}] ⚠️ ID visible pero vacío (min ${minuto + 1})`);
@@ -121,8 +128,6 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
             tokensFallidos.push(token);
             break;
           }
-
-          if (idDetectado) break;
 
           await new Promise(resolve => setTimeout(resolve, 60 * 1000));
         }
