@@ -86,55 +86,16 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
         let idDetectado = false;
 
         for (let minuto = 0; minuto < 5; minuto++) {
-          // Detectar si aparece mensaje de sesión expirada
+          // Detectar si aparece mensaje de sesión expirada ANTES de validar el ID
           const sesionExpirada = page.locator('text=sesión expirada');
           if (await sesionExpirada.isVisible({ timeout: 1000 }).catch(() => false)) {
             console.warn(`[TEST ${start + index + 1}] 🚫 Sesión expirada detectada (min ${minuto + 1})`);
             tokensFallidos.push(token);
-            break;
+            break; // No validar el ID del video si la sesión está expirada
           }
+          // Solo si NO está expirada, validar el ID del video
           try {
             const visible = await videoIdElement.isVisible({ timeout: 30000 });
             if (visible) {
               const idActual = (await videoIdElement.textContent())?.trim();
-              if (idActual) {
-                if (idActual !== lastId) {
-                  lastId = idActual;
-                  console.log(`[TEST ${start + index + 1}] 🎥 ID nuevo en min ${minuto + 1}: ${idActual}`);
-                  tokensExitosos.push(token);
-                  idDetectado = true;
-                }
-              } else {
-                console.log(`[TEST ${start + index + 1}] ⚠️ ID visible pero vacío (min ${minuto + 1})`);
-                idVacioCount++;
-              }
-            } else {
-              console.warn(`[TEST ${start + index + 1}] ⚠️ ID no visible (min ${minuto + 1})`);
-            }
-          } catch (e) {
-            console.warn(`[TEST ${start + index + 1}] ⚠️ Error detectando ID en minuto ${minuto + 1}: ${e.message}`);
-          }
-
-          await page.waitForTimeout(30000);
-        }
-
-        if (!idDetectado) {
-          console.warn(`[TEST ${start + index + 1}] ❌ No se detectó ningún ID válido durante toda la sesión.`);
-          tokensFallidos.push(token);
-        } else if (idVacioCount > 0) {
-          console.log(`[TEST ${start + index + 1}] 📭 Total de veces que el ID estuvo vacío: ${idVacioCount}`);
-        }
-      });
-    });
-  });
-
-  test.afterAll(() => {
-    console.log(`\n====================`);
-    console.log(`✅ Tokens exitosos: ${tokensExitosos.length}`);
-    tokensExitosos.forEach((t, i) => console.log(`✔️ ${i + 1}: ${t}`));
-
-    console.log(`\n❌ Tokens fallidos: ${tokensFallidos.length}`);
-    tokensFallidos.forEach((t, i) => console.log(`✖️ ${i + 1}: ${t}`));
-    console.log(`====================`);
-  });
-});
+              if
