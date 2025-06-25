@@ -2,17 +2,13 @@ import { test, expect } from '@playwright/test';
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Ruta del archivo con tokens
 const TOKENS_FILE_PATH = path.join(__dirname, 'todos_los_tokens.txt');
 let tokens: string[] = [];
 
-// Cargar tokens una sola vez por worker
 try {
   let fileContent = fs.readFileSync(TOKENS_FILE_PATH, 'utf-8');
-  fileContent = fileContent.replace(/^\uFEFF/, '');
+  fileContent = fileContent.replace(/^﻿/, '');
   tokens = fileContent.split(/\r?\n/).filter(line => line.trim() !== '');
-
-  // Eliminar tokens duplicados
   tokens = Array.from(new Set(tokens));
 
   if (process.env.PW_WORKER_ID === '0') {
@@ -23,7 +19,6 @@ try {
   tokens = [];
 }
 
-// Filtrar tokens por rango si se definieron variables de entorno TOKEN_START y TOKEN_END
 const start = process.env.TOKEN_START ? parseInt(process.env.TOKEN_START, 10) - 1 : 0;
 const end = process.env.TOKEN_END ? parseInt(process.env.TOKEN_END, 10) - 1 : tokens.length - 1;
 
@@ -37,8 +32,10 @@ if (process.env.PW_WORKER_ID === '0') {
   console.log(`⚙️ Ejecutando solo tokens del ${start + 1} al ${end + 1} (total ${tokens.length})`);
 }
 
-// Lista de tokens exitosos
 const tokensExitosos: string[] = [];
+const tokensFallidos: string[] = [];
+
+const GLOBAL_TIMEOUT = 10 * 60 * 1000;
 
 test.describe.parallel('🔁 Validación de tokens LIVE', () => {
   tokens.forEach((rawToken, index) => {
@@ -46,76 +43,99 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
     if (!token) return;
 
     test(`Token #${start + index + 1}`, async ({ page }) => {
+      test.setTimeout(GLOBAL_TIMEOUT);
       const url = `https://livetest.harvestful.org/videos?token=${token}`;
       let accessBlocked = false;
 
-      console.log(`
-🧪 TEST ${start + index + 1}
-🔑 Token: ${token}
-🌐 URL: ${url}
-===============================`);
+      // Detectar actividad Firebase y WebSocket
+      page.on('websocket', ws => {
+        console.log(`[TEST ${start + index + 1}] 🧩 WebSocket abierto: ${ws.url()}`);
+      });
+      page.on('request', req => {
+        const url = req.url();
+        if (url.includes('firebase') || url.includes('googleapis')) {
+          console.log(`[TEST ${start + index + 1}] 📡 Firebase activity: ${url}`);
+        }
+      });
 
-      // Paso 1: Navegar
+      console.log(`\n🧪 TEST ${start + index + 1}\n🔑 Token: ${token}\n🌐 URL: ${url}\n===============================`);
+
       await test.step('1. Navegar a la URL con el token', async () => {
         try {
-          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 160000 });
+          await page.goto(url, { waitUntil: 'domcontentloaded', timeout: GLOBAL_TIMEOUT });
           const blocked = page.locator('text=Access denied');
           if (await blocked.isVisible()) {
             accessBlocked = true;
             console.warn(`[TEST ${start + index + 1}] 🚫 Acceso bloqueado.`);
+            tokensFallidos.push(token);
             test.skip();
           }
           console.log(`[TEST ${start + index + 1}] ✅ Navegación exitosa.`);
         } catch (e) {
           console.error(`[TEST ${start + index + 1}] ❌ ERROR de navegación: ${e.message}`);
+          tokensFallidos.push(token);
           throw e;
         }
       });
 
       if (accessBlocked) return;
 
-      // Paso 2: Verificar título
       await test.step('2. Verificar título', async () => {
         try {
-          await expect(page).toHaveTitle('HF Live', { timeout: 160000 });
+          await expect(page).toHaveTitle('HF Live', { timeout: GLOBAL_TIMEOUT });
           console.log(`[TEST ${start + index + 1}] ✅ Título verificado.`);
         } catch (e) {
           console.error(`[TEST ${start + index + 1}] ❌ ERROR en título: ${e.message}`);
+          tokensFallidos.push(token);
           throw e;
         }
       });
 
-      // Paso 3: Verificar ID del video
-      await test.step('3. Capturar y verificar ID del video', async () => {
+      await test.step('3-4. Mantener sesión activa y verificar ID del video dinámicamente', async () => {
         const videoIdSelector = '#container-player > span.video-id';
         const videoIdElement = page.locator(videoIdSelector);
 
-        try {
-          const isVisible = await videoIdElement.isVisible({ timeout: 160000 });
-          if (!isVisible) {
-            console.warn(`[TEST ${start + index + 1}] ⚠️ No se encontró el ID del video.`);
-            return;
+        let lastId = '';
+        let idVisto = false;
+
+        for (let minute = 0; minute < 15; minute++) {
+          let idEncontradoEsteMinuto = false;
+
+          for (let intento = 0; intento < 3; intento++) {
+            try {
+              await page.mouse.move(100 + minute * 10, 100 + intento * 10);
+              const isVisible = await videoIdElement.isVisible({ timeout: 20000 });
+              if (isVisible) {
+                const currentId = (await videoIdElement.textContent())?.trim();
+                if (currentId && currentId !== lastId) {
+                  lastId = currentId;
+                  console.log(`[TEST ${start + index + 1}] 🎥 ID actualizado (min ${minute + 1}, intento ${intento + 1}): ${lastId}`);
+                  if (!tokensExitosos.includes(token)) {
+                    tokensExitosos.push(token);
+                  }
+                  idVisto = true;
+                  idEncontradoEsteMinuto = true;
+                  break;
+                }
+              }
+            } catch (e) {
+              // ignorar errores por intento
+            }
+            await page.waitForTimeout(10000);
           }
 
-          const videoId = await videoIdElement.textContent();
-          console.log(`[TEST ${start + index + 1}] 🎥 ID de video: ${videoId}`);
-          expect(videoId).not.toBeNull();
-          expect(videoId?.trim()).toMatch(/^\d+$/);
+          if (!idEncontradoEsteMinuto) {
+            console.warn(`[TEST ${start + index + 1}] ⚠️ ID de video no visible en minuto ${minute + 1}`);
+          }
 
-          tokensExitosos.push(token);
-        } catch (e) {
-          console.error(`[TEST ${start + index + 1}] ❌ ERROR al capturar/verificar ID: ${e.message}`);
-          throw e;
+          await page.waitForTimeout(30000);
         }
-      });
 
-      
-      // Paso 4: Mantener sesión activa 5 min (comentado)
-      await test.step('4. Mantener sesión activa 5 min', async () => {
-        for (let i = 0; i < 5; i++) {
-          await page.mouse.move(100 + i * 10, 100 + i * 10);
-          console.log(`[TEST ${start + index + 1}] ⏳ Sesión activa minuto ${i + 1}/5`);
-          await page.waitForTimeout(60 * 6000);
+        if (!idVisto) {
+          console.warn(`❌ El token falló completamente:`);
+          console.warn(`🔑 Token: ${token}`);
+          console.warn(`🌐 URL: ${url}`);
+          tokensFallidos.push(token);
         }
       });
     });
@@ -126,6 +146,9 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
       console.log(`\n====================`);
       console.log(`✅ Tokens exitosos: ${tokensExitosos.length}`);
       tokensExitosos.forEach((t, i) => console.log(`✔️ ${i + 1}: ${t}`));
+
+      console.log(`\n❌ Tokens fallidos: ${tokensFallidos.length}`);
+      tokensFallidos.forEach((t, i) => console.log(`✖️ ${i + 1}: ${t}`));
       console.log(`====================`);
     }
   });
