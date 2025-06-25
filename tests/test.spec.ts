@@ -86,6 +86,13 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
         let idDetectado = false;
 
         for (let minuto = 0; minuto < 5; minuto++) {
+          // Detectar si aparece mensaje de sesión expirada
+          const sesionExpirada = page.locator('text=sesión expirada');
+          if (await sesionExpirada.isVisible({ timeout: 1000 }).catch(() => false)) {
+            console.warn(`[TEST ${start + index + 1}] 🚫 Sesión expirada detectada (min ${minuto + 1})`);
+            tokensFallidos.push(token);
+            break;
+          }
           try {
             const visible = await videoIdElement.isVisible({ timeout: 30000 });
             if (visible) {
