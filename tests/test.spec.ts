@@ -73,7 +73,7 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
 
       await test.step('3-4. Mantener sesión activa y verificar ID del video dinámicamente', async () => {
         // Validar antes si la sesión está expirada y salir si es así
-        const sesionExpirada = page.locator('text=sesión expirada');
+        const sesionExpirada = page.locator('h2.title-style-2.txt-upper.mt-05', { hasText: 'Session expired' });
         if (await sesionExpirada.isVisible({ timeout: 3000 }).catch(() => false)) {
           console.warn(`[TEST ${start + index + 1}] 🚫 Sesión expirada detectada antes de validación de ID.`);
           tokensFallidos.push(token);
