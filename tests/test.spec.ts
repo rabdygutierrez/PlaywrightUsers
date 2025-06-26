@@ -26,6 +26,9 @@ const tokensFallidos: string[] = [];
 
 const GLOBAL_TIMEOUT = 10 * 60 * 1000;
 
+// Parametrizar duración del ciclo de verificación por variable de entorno
+const DURATION_MINUTES = process.env.DURATION_MINUTES ? parseInt(process.env.DURATION_MINUTES, 10) : 20;
+
 // === Test principal ===
 test.describe.parallel('🔁 Validación de tokens LIVE', () => {
   tokens.forEach((rawToken, index) => {
@@ -92,8 +95,8 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
         let idDetectado = false;
         let idDetectadoMinuto = -1;
 
-        // Mantener sesión activa y verificar ID durante 15 minutos
-        for (let minuto = 0; minuto < 15; minuto++) {
+        // Mantener sesión activa y verificar ID durante DURATION_MINUTES minutos
+        for (let minuto = 0; minuto < DURATION_MINUTES; minuto++) {
           if (await sesionExpirada.isVisible({ timeout: 1000 }).catch(() => false)) {
             console.warn(`[TEST ${start + index + 1}] 🚫 Sesión expirada detectada (min ${minuto + 1})`);
             tokensFallidos.push(token);
