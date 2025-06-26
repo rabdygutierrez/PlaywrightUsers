@@ -89,7 +89,7 @@ test.describe.parallel('🔁 Validación de tokens LIVE', () => {
           console.log(`[TEST ${start + index + 1}] 🖱️ Botón 'Seleccionar' clickeado.`);
         }
 
-        const videoIdSelector = '#container-player > span.video-id';
+        const videoIdSelector = '.video-id';
         const videoIdElement = page.locator(videoIdSelector);
         let lastId = '';
         let idDetectado = false;
